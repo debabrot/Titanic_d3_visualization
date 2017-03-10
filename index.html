@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <style>
+          header {
+                 position : fixed;
+                 top :5px;
+                 left : 30%;
+                 text-align : center;      
+                 }
+             nav {
+                  margin-top : 180px;
+                  margin-left : 30px;
+                  line-height : 30px;
+                  background-color : #c4f5ff;
+                  height : 350px;
+                  width : 120px;
+                  float : left;
+                  padding : 30px;
+                  }
+             .bar {
+                  fill: steelblue;
+                  }
+       .bar:hover {
+                  fill: brown;
+                  }
+    .axis--x path {
+                  display: none;
+                  }
+          .bartext{
+                  text-anchor : middle;
+                  alignment-baseline : before-edge;
+                  fill : white;
+                  }
+    </style>
+    <script type="text/javascript">
+    
+        function draw( raw_data ) {
+            
+            // Define Margins
+            var graphWidth = 500, graphHeight = 400;
+            var margins = { left: 200, top: 180, right: 100, bottom: 50 };
+            var totalHeight = graphHeight + margins.top + margins.bottom;
+            var totalWidth = graphWidth + margins.left + margins.right;
+          
+            // Exclude data with 0 Age Value
+            var data = raw_data.filter( function( d ){
+               if ( d['Age']!== '' ){
+               return d;
+               };
+            });
+
+            // Create Age Group column
+            var data = data.map( function( d ){
+                if ( +d['Age'] < 18 ) {
+                    return { survived : +d['Survived'] , 
+                             class : +d['Pclass'], 
+                             gender : d['Sex'], 
+                             age_group : 'Young' };
+                }
+                else if ( +d['Age'] >= 18 && +d['Age'] < 35 ) {
+                    return { survived : +d['Survived'] , 
+                             class : +d['Pclass'], 
+                             gender : d['Sex'], 
+                             age_group : 'Adult' };
+                }
+                else if ( +d['Age'] >= 35 && +d['Age'] < 55 ) {
+                    return { survived : +d['Survived'] , 
+                             class : +d['Pclass'], 
+                             gender : d['Sex'], 
+                             age_group : 'Middle Aged' };
+                }
+                else {
+                    return { survived : +d['Survived'] , 
+                             class : +d['Pclass'], 
+                             gender : d['Sex'], 
+                             age_group : 'Old' };
+                };       
+            });
+            
+            // Variables with total are for all passengers and without are for Survivors
+            var total_young = 0, young = 0;
+            var total_adult = 0, adult = 0;
+            var total_middle_age = 0, middle_age = 0;
+            var total_old = 0, old = 0;
+            
+            // Get the checked values from radio butons
+            var sex = d3.select('input[name="gender"]:checked').property("value"); 
+            var status = d3.select('input[name="classes"]:checked').property("value"); 
+            
+            // Count the survivors by the checked gender and class
+            data.forEach( function( d ){
+                if( d.gender === sex && d.class === +status){
+                    if( d.age_group === "Young"){
+                        total_young += 1;
+                        if( d.survived === 1 ){
+                            young += 1;
+                        };                        
+                    }
+                    else if( d.age_group === "Adult"){
+                        total_adult += 1;
+                        if( d.survived === 1 ){
+                            adult += 1;
+                        };                        
+                    }
+                    else if( d.age_group === "Middle Aged"){
+                        total_middle_age += 1;
+                        if( d.survived === 1 ){
+                            middle_age += 1;
+                        };                        
+                    }
+                    else if( d.age_group === "Old"){
+                        total_old += 1;
+                        if( d.survived === 1 ){
+                            old += 1;
+                        };                        
+                    };
+                };     
+            });  
+                         
+            var all_ages = young + adult + middle_age + old;
+            var total_all_ages = total_young + total_adult + total_middle_age + total_old ;
+            
+            // Create array containing percentage of survivors by age group
+            plot_data = [{
+                "ages": 'all ages',    "count": +( all_ages / total_all_ages * 100 ).toFixed(2) },
+                {
+                "ages": 'young',       "count": +( young / total_young * 100 ).toFixed(2) },
+                {
+                "ages": 'adult',       "count": +( adult / total_adult * 100 ).toFixed(2) },
+                {
+                "ages": 'middle aged', "count": +( middle_age / total_middle_age * 100 ).toFixed(2) },
+                {
+                "ages": 'old',         "count": +( old / total_old * 100 ).toFixed(2) }];
+
+            
+            // Create SVG body
+            var svg = d3.select("body")
+                        .append("svg")
+                        .attr("width",  totalWidth)
+                        .attr("height",  totalHeight);
+            var g = svg.append("g")
+                           .attr("transform", "translate(" + margins.left + "," + margins.top + ")");
+            
+            // Create scales
+            var x = d3.scaleBand().rangeRound([0, graphWidth]).padding(0.1),
+                y = d3.scaleLinear().rangeRound([graphHeight, 0]);
+
+            x.domain( plot_data.map( function(d) { return d.ages; }));
+            y.domain([0, d3.max( plot_data, function(d) { return d.count; })]);
+
+            // Create x axis
+            g.append("g")
+             .attr("class", "axis axis--x")
+             .attr("transform", "translate(0," + graphHeight + ")")
+             .call( d3.axisBottom(x) );
+
+            // Create y axis
+            g.append("g")
+             .attr("class", "axis axis--y")
+             .call( d3.axisLeft( y ).tickFormat( function(d) { return d + "%"} ))
+             .append("text");
+
+            // Create rectangles for the bars
+              g.selectAll(".bar")
+               .data(plot_data)
+               .enter().append("rect")
+               .attr("class", "bar")
+               .attr("x", function(d,i) { return x(d.ages); })
+               .attr("y", graphHeight)
+               .attr("width", x.bandwidth())
+               .attr("height", 0 )
+               .transition()
+		    .duration( 2000)
+		    .delay(function (d, i) {
+    				return i * 200;
+        			})
+               .attr("y", function(d,i) { return y(d.count); })
+               .attr("height", function(d,i) { return graphHeight - y(d.count); });
+            
+            // Insert values inside bargraph
+            var xTextPadding = 45;
+            var yTextPadding = 4;
+            svg.selectAll(".bartext")
+               .data(plot_data)
+               .enter()
+               .append("text")
+               .attr("class", "bartext")
+               .attr("x", function(d,i) {
+                    return margins.left + xTextPadding + x(d.ages)  ;
+                })
+               .attr("y", function(d,i) {
+                    return margins.top + y(d.count)+yTextPadding;
+                })
+               .text(function(d){
+                    return d.count;
+                });
+            
+            // Create title of plot
+            var class_string;
+            if (+status === 1) {
+                class_string = 'first';}
+            else if (+status === 2) {
+                class_string = 'second';}
+            else if (+status === 3) {
+                class_string = 'third';}
+            d3.select('header')
+              .append('h3')
+              .text("Percentages of " + sex + " " + class_string +" class Survivors");
+        }
+        
+    </script>
+</head>
+<body>
+    <header>
+        <h1>TITANIC SURVIVORS</h1>
+        <br>
+    </header>
+    <nav>
+        <div class = "inputs">
+            <form id = "input_values">
+                <label>
+                    <strong>Gender</strong>
+                    <br>
+                </label>
+                <label>Male<input type="radio" name="gender" value="male" ></label>
+                <br>
+                <label>Female<input type="radio" name="gender" value="female" checked></label>
+                <br>
+                <br>
+                <label>
+                    <strong>Passenger Class</strong>
+                    <br>
+                </label>
+                <label>First Class<input type="radio" name="classes" value="1" checked></label>
+                <br>
+                <label>Second Class<input type="radio" name="classes" value="2"></label>
+                <br>
+                <label>Third Class<input type="radio" name="classes" value="3"></label>
+                <br>
+                <br>
+                <input name = "drawgraph" type = "button" value = "Get graph" onclick = "update()" />
+            </form>
+        </div>
+    </nav>
+    
+    <script type="text/javascript">
+        d3.csv( "titanic_data.csv", draw );
+        function update(){
+            d3.select("svg").remove();
+            d3.select("h3").remove();
+            d3.csv( "titanic_data.csv", draw );
+        }
+    </script>
+</body>
+</html>
